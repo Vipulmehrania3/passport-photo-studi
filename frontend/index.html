@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Passport Photo Studio</title>
+<meta name="description" content="Crop, remove backgrounds, edit and print 35x45mm passport photos on A4 sheets.">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  // Runtime config only. No secrets live here — all ClearBackdrop credentials
+  // stay in backend/.env. Leave apiBase empty to use same-origin /api.
+  window.APP_CONFIG = { apiBase: "" };
+</script>
+</head>
+<body>
+
+<header class="site-header no-print">
+  <div class="wrap header-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="2.5" width="16" height="19" rx="2.5"></rect>
+          <circle cx="12" cy="9.5" r="3.2"></circle>
+          <path d="M6.8 18.2c1.1-2.4 3-3.6 5.2-3.6s4.1 1.2 5.2 3.6"></path>
+        </svg>
+      </span>
+      <div>
+        <h1>Passport Photo Studio</h1>
+        <p class="brand-sub">35 &times; 45 mm &middot; A4 sheets &middot; ClearBackdrop background removal</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="quota" id="quotaBox" title="ClearBackdrop free tier: 100 images per hour per IP">
+        <span class="quota-dot" id="quotaDot"></span>
+        <span id="quotaText">Quota: &ndash;</span>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="loadSamplesBtn">Load samples</button>
+      <button type="button" class="btn btn-ghost btn-sm danger" id="clearAllBtn">Clear all</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 1. Upload ------------------------------------------------------------->
+  <section class="card no-print" id="uploadCard">
+    <div class="card-head">
+      <h2><span class="step">1</span> Upload photos</h2>
+      <p class="hint">JPG, JPEG, PNG or WEBP &middot; select or drop multiple files &middot; each one is cropped before background removal.</p>
+    </div>
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload photos">
+      <input type="file" id="fileInput" accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple hidden>
+      <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 16V4"></path><path d="m7.5 8.5 4.5-4.5 4.5 4.5"></path>
+        <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"></path>
+      </svg>
+      <p class="dz-title">Drop images here</p>
+      <p class="dz-sub">or <span class="linklike">browse files</span> &mdash; up to 15&nbsp;MB each</p>
+    </div>
+
+    <div class="batch" id="batchPanel" hidden>
+      <div class="batch-head">
+        <span id="batchLabel">Processing 0 of 0</span>
+        <span class="muted" id="batchStage"></span>
+      </div>
+      <div class="progress"><div class="progress-bar" id="batchBar"></div></div>
+      <div class="batch-actions">
+        <button type="button" class="btn btn-ghost btn-sm" id="batchCancelBtn">Cancel remaining</button>
+      </div>
+    </div>
+
+    <p class="pipeline">
+      <span>Upload</span><i>&rarr;</i><span>Crop 35:45</span><i>&rarr;</i><span>ClearBackdrop</span><i>&rarr;</i><span>Library</span><i>&rarr;</i><span>Edit</span><i>&rarr;</i><span>A4</span><i>&rarr;</i><span>Print</span>
+    </p>
+  </section>
+
+  <div class="grid-2">
+
+    <!-- 2. Library ----------------------------------------------------------->
+    <section class="card no-print" id="libraryCard">
+      <div class="card-head row-between">
+        <div>
+          <h2><span class="step">2</span> Photo library</h2>
+          <p class="hint">Every card is a cutout with a transparent background. Copies control the A4 sheet.</p>
+        </div>
+        <div class="lib-tools">
+          <button type="button" class="btn btn-ghost btn-sm" id="selectAllBtn">Select all</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="clearSelBtn">None</button>
+        </div>
+      </div>
+      <div class="empty" id="libraryEmpty">
+        <p>No photos yet.</p>
+        <p class="muted">Upload an image &mdash; you will crop it first, then the background is removed.</p>
+      </div>
+      <div class="photo-grid" id="photoGrid"></div>
+
+      <div id="failedPanel" class="failed-panel" hidden>
+        <h3>Needs attention</h3>
+        <p class="hint">Background removal failed for these images. They are <strong>not</strong> added to the library &mdash; the original background is never used.</p>
+        <div id="failedList"></div>
+      </div>
+    </section>
+
+    <!-- 3. A4 ---------------------------------------------------------------->
+    <section class="card no-print" id="sheetCard">
+      <div class="card-head row-between">
+        <div>
+          <h2><span class="step">3</span> A4 sheet</h2>
+          <p class="hint">210 &times; 297 mm &middot; photos 35 &times; 45 mm, exact ratio.</p>
+        </div>
+        <div class="sheet-tools">
+          <label class="field-sm">DPI
+            <select id="dpiSelect">
+              <option value="300" selected>300</option>
+              <option value="600">600</option>
+              <option value="150">150</option>
+            </select>
+          </label>
+          <button type="button" class="btn btn-ghost btn-sm" id="regenerateBtn">Regenerate</button>
+        </div>
+      </div>
+
+      <div class="sheet-summary" id="sheetSummary">Select photos and set copies to build a sheet.</div>
+
+      <div class="sheet-preview-wrap" id="sheetPreviewWrap">
+        <div class="sheet-preview-empty" id="sheetPreviewEmpty">A4 preview appears here</div>
+        <div class="sheet-pages" id="sheetPages"></div>
+      </div>
+
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-primary" id="printBtn" disabled>Print</button>
+        <button type="button" class="btn" id="downloadPdfBtn" disabled>Download PDF</button>
+        <button type="button" class="btn" id="downloadPngBtn" disabled>Download PNG</button>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer no-print">
+  <div class="wrap">
+    <p>
+      Pipeline: <code>Browser &rarr; our backend &rarr; ClearBackdrop</code>.
+      The browser never calls ClearBackdrop directly and holds no credentials.
+    </p>
+  </div>
+</footer>
+
+<!-- Modals ------------------------------------------------------------------->
+<div class="modal" id="modalRoot" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-close="1"></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <h2 id="modalTitle">Modal</h2>
+      <button type="button" class="icon-btn" id="modalCloseBtn" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<!-- Print surface: only this is printed -------------------------------------->
+<div id="printArea" aria-hidden="true"></div>
+
+<div class="toast-stack no-print" id="toastStack" role="status" aria-live="polite"></div>
+
+<noscript><p class="wrap">This application requires JavaScript.</p></noscript>
+
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/crop.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/a4.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
